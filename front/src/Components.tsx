@@ -1,91 +1,128 @@
 import * as React from "react";
+import {Lesson, Student} from "./Entities";
 
-let subjects = [
-    "Программирование",
-    "АиГ",
-    "Информатика",
-    "Колпаков",
-    "Анализ",
-    "История",
-];
+const base_url = "http://localhost:7139";
 
-class Student {
-    private vk_id: Number;
-    public name: string;
+export class MainTable extends React.Component<{}, {
+    isLoaded: boolean,
+    poll_url: string,
+    lessons: Lesson[],
+    students: Student[],
+    error: any
+}> {
+    constructor(props) {
+        super(props);
 
-    constructor(vk_id: Number, name: string) {
-        this.vk_id = vk_id;
-        this.name = name;
+        this.state = {
+            isLoaded: false,
+
+            poll_url: "",
+
+            students: [],
+            lessons: [],
+
+            error: null
+        }
+
+        this.handleChangePollURL = this.handleChangePollURL.bind(this);
+        this.handleSubmit = this.handleSubmit.bind(this);
     }
 
-}
+    handleChangePollURL = (event) => this.setState({poll_url: event.target.value});
 
-const students: Student[] = [
-    new Student(364977556, "Соколов"),
-    new Student(350738902, "Мавликаев"),
-    new Student(212961717, "Рыжиков"),
-    new Student(438049849, "Ильясов"),
-    new Student(216533425, "Комосский"),
-    new Student(736068632, "Слабнова"),
-    new Student(413517083, "Шляхтин"),
-    new Student(440597916, "Богатов"),
-    new Student(132042348, "Долотов"),
-    new Student(357468734, "Тищенко"),
-    new Student(446496982, "Потапова"),
-    new Student(289794276, "Малюская"),
-    new Student(140725073, "Лисицкий"),
-    new Student(408071406, "Двиков"),
-    new Student(467091042, "Аникина"),
-    new Student(465951261, "Маленковская"),
-    new Student(459432773, "Заметаев"),
-    new Student(156299873, "Газукина"),
-    new Student(292074142, "Зазуля"),
-    new Student(296380826, "Кузнецов"),
-    new Student(183568418, "Фомина"),
-    new Student(402681829, "Кривов"),
-].sort((el1, el2) => el1.name.localeCompare(el2.name));
+    handleSubmit(event) {
+        let substr_index = this.state.poll_url.indexOf("poll") + 4;
+        let substr = this.state.poll_url.slice(substr_index);
+        let poll_id = substr.split("_")[0];
+        let owner_id = substr.split("_")[1];
 
-const Head: React.FC = () => {
-    return (<thead>
-    <th className={'has-text-centered'}>Студенты</th>
-    {subjects.map(element => <th className={"has-text-centered"}>{element}</th>)}
-    </thead>);
-}
+        fetch(base_url + "/lessons?" + new URLSearchParams({
+            "owner_id": owner_id,
+            "poll_id": poll_id
+        }),
+            {
+                mode: 'cors',
+                headers: {
+                    'Access-Control-Allow-Origin': '*'
+                }
+            })
+            .then((response) => {
+                return response.json();
+            })
+            .then((data: Lesson[]) => {
+                this.setState({
+                    lessons: data,
+                })
+            });
 
-const Body: React.FC = () => {
-    return (
-        <tbody>
+        this.setState({isLoaded: true});
+    }
 
-        {students.map((student: Student) => <tr>
-            <td className={"has-text-left"}>{student.name}</td>
-            {subjects.map(() =>
-                <td>
-                    {
-                        Math.floor(Math.random() * 10) % 2 === 0 ?
-                            <span className="icon has-text-success">
-                                        <i className="fas fa-check-square"></i>
-                                    </span>
-                            :
-                            <span className="icon has-text-danger">
-                                        <i className="fas fa-ban"></i>
-                                    </span>
-                    }
-                </td>)}
-        </tr>)}
-        </tbody>
-    )
-}
+    componentDidMount() {
+        if (this.state.students.length !== 0) return;
+
+        fetch(base_url + "/students",
+            {
+                mode: 'cors',
+                headers: {
+                    'Access-Control-Allow-Origin': '*'
+                }
+            })
+            .then((response) => {
+                return response.json();
+            })
+            .then((data: Student[]) => {
+                data.sort((el1, el2) => el1.name.localeCompare(el2.name))
+                this.setState({
+                    students: data,
+                })
+            });
+    }
+
+    render() {
+        return <>
+            <div className="container">
+                <div className="is-max-desktop columns">
+                    <div className="column">
+                        <input className="input" value={this.state.poll_url}
+                               onChange={this.handleChangePollURL}
+                               placeholder="Ссылка на опрос"/>
+                    </div>
+                    <div className="column">
+                        <input className="button" value="Применить" onClick={this.handleSubmit}/>
+                    </div>
+                </div>
+            </div>
 
 
-const MainTable: React.FC = () => {
-    return (
-        <>
             <table className="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
-                <Head/>
-                <Body/>
-            </table>
-        </>
-    );
-}
+                <thead>
+                <th className={'has-text-centered'}>Студенты</th>
+                {this.state.lessons.map(lesson => <th className={"has-text-centered"}>{lesson.name}</th>)}
+                </thead>
 
-export default MainTable;
+                <tbody>
+                {
+                    this.state.students.map((student: Student) =>
+                        <tr>
+                            <td className={"has-text-left"}>{student.name}</td>
+                            {this.state.lessons.map(lesson =>
+                                <td>
+                                    {lesson.student_ids.includes(student.vk_id) ?
+                                        <span className="icon has-text-success">
+                                            <i className="fas fa-check-square"></i>
+                                        </span>
+                                        :
+                                        <span className="icon has-text-danger">
+                                            <i className="fas fa-ban"></i>
+                                        </span>
+                                    }
+                                </td>
+                            )}
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </>;
+    }
+}
