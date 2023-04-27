@@ -1,8 +1,12 @@
+import asyncio
 import os
-import webbrowser
-import argparse
+
+import uvicorn as uvicorn
+from fastapi import FastAPI
 
 import requests as requests
+
+
 
 # def get_access_token(client_id: int) -> None:
 #     assert isinstance(client_id, int), 'clinet_id must be positive integer'
@@ -20,8 +24,9 @@ import requests as requests
 #     webbrowser.open_new_tab(url)
 
 
-dict_names = {}
-
+dict_names = {
+    1234: "StudentName"
+}
 
 class Lesson:
     def __init__(self, name, student_ids):
@@ -37,8 +42,16 @@ class Lesson:
 domain = "https://api.vk.com/method"
 token = os.environ['TOKEN']
 
+app = FastAPI()
+async def main():
+    config = uvicorn.Config("main:app", port=7139, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
-def get_poll_answers(poll_id='**', owner_id='**'):
+if __name__ == "__main__":
+    asyncio.run(main())
+
+def get_poll_answers(poll_id='837100981', owner_id='736068632'):
     query = f"{domain}/polls.getById?" \
             f"owner_id={owner_id}&" \
             f"poll_id={poll_id}&name_case=nom&v=5.131&" \
@@ -51,18 +64,14 @@ def get_poll_answers(poll_id='**', owner_id='**'):
         answers[answer['id']] = answer['text']
     lessons = get_vote_results(poll_id, answers)
 
-    result = ''
-    for lesson_id in lessons.keys():
-        # result += str(lesson_id) + ' '
-        result += str(lessons[lesson_id]) + '<hr>'
-    return result
+    return lessons
 
 
 def get_vote_results(poll_id, answers):
     answer_id_strs = ','.join(map(lambda el: str(el), answers.keys()))
 
     query = f"{domain}/polls.getVoters?" \
-            f"owner_id=**&" \
+            f"owner_id=736068632&" \
             f"poll_id={poll_id}&name_case=nom&v=5.131&" \
             f"answer_ids={answer_id_strs}&" \
             f"access_token={token}"
@@ -78,13 +87,11 @@ def get_vote_results(poll_id, answers):
         )
     return lessons
 
+# gets from poll url owner and poll ids
+def data_from_url():
+    pass
 
-from bottle import route, run, template
 
-
-@route('/')
-def index():
+@app.get("/")
+def read_root():
     return get_poll_answers()
-
-
-run(host='localhost', port=7139)
