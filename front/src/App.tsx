@@ -3,7 +3,6 @@ import * as React from "react";
 import MainTable from "./Components";
 import './Components';
 
-import $ from 'jquery';
 
 /*function getAnswersId() {
     let token = 'vk1.a.pykfcgaUdeb0JxdF5yOOIoqvGwCVYRUeHNPWxiM49T8kx8HGB5nB5huP97Ratm3sORpvlor24tg40-9j0CfY8xTX1n2bl1aZgor9bDKAroGyiXZidIRFJ4UX3dPS6GZarWt0OhMAlUDknV5jMLgLMzgvCey_9WJ3uoSn-fPwfWXc1UI02rSYylRHpEQT7Prro5B6aGguFQk7V4KxKwfumw'
@@ -27,11 +26,9 @@ import $ from 'jquery';
 
 
 function App() {
-    //getAnswersId();
     return (
         <div className="App">
-            Hey
-            {/*<MainTable/>*/}
+            <MainTable/>
         </div>
     );
 }
