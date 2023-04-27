@@ -1,61 +1,40 @@
 import asyncio
+import json
 import os
 
 import uvicorn as uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 import requests as requests
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.cors import CORSMiddleware
 
 
+def get_students_from_file():
+    file = open("students.json", 'r', encoding='utf-8')
+    students = json.loads(file.read())
+    file.close()
+    return students
 
-# def get_access_token(client_id: int) -> None:
-#     assert isinstance(client_id, int), 'clinet_id must be positive integer'
-#     assert client_id > 0, 'clinet_id must be positive integer'
-#
-#     url = f"""\
-#     https://oauth.vk.com/authorize
-#     ?client_id={client_id}
-#     &display=page
-#     &redirect_uri=https://oauth.vk.com/blank.hmtl
-#     &scope=wall
-#     &response_type=token
-#     &v=5.131
-#     """.replace(" ", "").format(client_id=client_id, scope='wall')
-#     webbrowser.open_new_tab(url)
-
-
-dict_names = {
-    1234: "StudentName"
-}
 
 class Lesson:
-    def __init__(self, name, student_ids):
+    def __init__(self, lesson_id, name, student_ids):
+        self.id = lesson_id
         self.name = name
-        self.students = [dict_names[st_id] for st_id in student_ids]
-        self.students.sort()
+        self.student_ids = student_ids
 
-    def __str__(self):
-        string = '<br>' + '<br>'.join(self.students)
-        return f"{self.name}: {string}<br>"
-
-
-domain = "https://api.vk.com/method"
+base_url = "https://api.vk.com/method"
 token = os.environ['TOKEN']
 
-app = FastAPI()
-async def main():
-    config = uvicorn.Config("main:app", port=7139, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-def get_poll_answers(poll_id='837100981', owner_id='736068632'):
-    query = f"{domain}/polls.getById?" \
+def get_poll_answers(poll_id, owner_id):
+    query = f"{base_url}/polls.getById?" \
             f"owner_id={owner_id}&" \
-            f"poll_id={poll_id}&name_case=nom&v=5.131&" \
+            f"poll_id={poll_id}&" \
+            f"name_case=nom&v=5.131&" \
             f"access_token={token}"
+
+    print(query)
     response_json = requests.get(query).json()
     answers_json = response_json["response"]["answers"]
 
@@ -68,23 +47,22 @@ def get_poll_answers(poll_id='837100981', owner_id='736068632'):
 
 
 def get_vote_results(poll_id, answers):
-    answer_id_strs = ','.join(map(lambda el: str(el), answers.keys()))
+    answer_id_strs = ','.join(map(lambda key: str(key), answers.keys()))
 
-    query = f"{domain}/polls.getVoters?" \
+    query = f"{base_url}/polls.getVoters?" \
             f"owner_id=736068632&" \
-            f"poll_id={poll_id}&name_case=nom&v=5.131&" \
+            f"poll_id={poll_id}&" \
+            f"name_case=nom&v=5.131&" \
             f"answer_ids={answer_id_strs}&" \
             f"access_token={token}"
 
     response_json = requests.get(query).json()
     answers_json = response_json["response"]
 
-    lessons = {}
-    for el in answers_json:
-        lessons[el['answer_id']] = Lesson(
-            answers[el['answer_id']],
-            el['users']['items']
-        )
+    lessons = []
+    for answer in answers_json:
+        lesson = Lesson(answer['answer_id'], answers[answer['answer_id']], answer['users']['items'])
+        lessons.append(lesson)
     return lessons
 
 # gets from poll url owner and poll ids
@@ -92,6 +70,41 @@ def data_from_url():
     pass
 
 
+app = FastAPI()
+app.mount('/static',
+          StaticFiles(directory='../front/build/static', html=True), name='static')
+
+origins = [
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+async def main():
+    config = uvicorn.Config("main:app", port=7139, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+templates = Jinja2Templates(directory="../front/build")
 @app.get("/")
-def read_root():
-    return get_poll_answers()
+async def get_page(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/lessons")
+async def get_lessons(owner_id, poll_id):
+    return get_poll_answers(owner_id, poll_id)
+
+@app.get("/students")
+async def get_students():
+    return get_students_from_file()
+
